@@ -59,6 +59,13 @@ function validateRequiredEnv(env: MoltbotEnv): string[] {
     missing.push('MOLTBOT_GATEWAY_TOKEN');
   }
 
+  if (!env.CF_ACCESS_TEAM_DOMAIN) {
+    missing.push('CF_ACCESS_TEAM_DOMAIN');
+  }
+
+  if (!env.CF_ACCESS_AUD) {
+    missing.push('CF_ACCESS_AUD');
+  }
 
   // Check for AI Gateway or direct Anthropic configuration
   if (env.AI_GATEWAY_API_KEY) {
@@ -151,8 +158,7 @@ app.use('*', async (c, next) => {
     return next();
   }
   
-  const missingVars = createAccessMiddleware
-    (c.env);
+  const missingVars = validateRequiredEnv(c.env);
   if (missingVars.length > 0) {
     console.error('[CONFIG] Missing required environment variables:', missingVars.join(', '));
     
@@ -175,14 +181,8 @@ app.use('*', async (c, next) => {
   return next();
 });
 
-// Middleware: Cloudflare Access authentication for protected routes (only if configured)
+// Middleware: Cloudflare Access authentication for protected routes
 app.use('*', async (c, next) => {
-  // Skip Cloudflare Access if CF_ACCESS variables are not configured
-  if (!c.env.CF_ACCESS_TEAM_DOMAIN || !c.env.CF_ACCESS_AUD) {
-    console.log('[AUTH] Cloudflare Access not configured, skipping authentication');
-    return next();
-  }
-  
   // Determine response type based on Accept header
   const acceptsHtml = c.req.header('Accept')?.includes('text/html');
   const middleware = createAccessMiddleware({ 
@@ -192,6 +192,7 @@ app.use('*', async (c, next) => {
   
   return middleware(c, next);
 });
+
 // Mount API routes (protected by Cloudflare Access)
 app.route('/api', api);
 
